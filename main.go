@@ -5,13 +5,11 @@ import (
 	"unsafe"
 
 	"github.com/go-gl/mathgl/mgl32"
-	"github.com/justinclift/wasm-rotating-cube/gltypes"
+	"github.com/justinclift/webgl"
 )
 
 var (
-	gl      js.Value
-	glTypes gltypes.GLTypes
-
+	gl          js.Value
 	movMatrix   mgl32.Mat4
 	ModelMatrix js.Value
 	tmark       float64
@@ -83,38 +81,35 @@ func main() {
 		return
 	}
 
-	// Get some WebGL bindings
-	glTypes.New(gl)
-
 	// Convert buffers to JS TypedArrays
-	var colors = js.TypedArrayOf(colorsNative)
-	var vertices = js.TypedArrayOf(verticesNative)
-	var indices = js.TypedArrayOf(indicesNative)
+	var colors = webgl.SliceToTypedArray(colorsNative)
+	var vertices = webgl.SliceToTypedArray(verticesNative)
+	var indices = webgl.SliceToTypedArray(indicesNative)
 
 	// Create vertex buffer
 	vertexBuffer := gl.Call("createBuffer")
-	gl.Call("bindBuffer", glTypes.ArrayBuffer, vertexBuffer)
-	gl.Call("bufferData", glTypes.ArrayBuffer, vertices, glTypes.StaticDraw)
+	gl.Call("bindBuffer", webgl.ARRAY_BUFFER, vertexBuffer)
+	gl.Call("bufferData", webgl.ARRAY_BUFFER, vertices, webgl.STATIC_DRAW)
 
 	// Create color buffer
 	colorBuffer := gl.Call("createBuffer")
-	gl.Call("bindBuffer", glTypes.ArrayBuffer, colorBuffer)
-	gl.Call("bufferData", glTypes.ArrayBuffer, colors, glTypes.StaticDraw)
+	gl.Call("bindBuffer", webgl.ARRAY_BUFFER, colorBuffer)
+	gl.Call("bufferData", webgl.ARRAY_BUFFER, colors, webgl.STATIC_DRAW)
 
 	// Create index buffer
 	indexBuffer := gl.Call("createBuffer")
-	gl.Call("bindBuffer", glTypes.ElementArrayBuffer, indexBuffer)
-	gl.Call("bufferData", glTypes.ElementArrayBuffer, indices, glTypes.StaticDraw)
+	gl.Call("bindBuffer", webgl.ELEMENT_ARRAY_BUFFER, indexBuffer)
+	gl.Call("bufferData", webgl.ELEMENT_ARRAY_BUFFER, indices, webgl.STATIC_DRAW)
 
 	// * Shaders *
 
 	// Create a vertex shader object
-	vertShader := gl.Call("createShader", glTypes.VertexShader)
+	vertShader := gl.Call("createShader", webgl.VERTEX_SHADER)
 	gl.Call("shaderSource", vertShader, vertShaderCode)
 	gl.Call("compileShader", vertShader)
 
 	// Create fragment shader object
-	fragShader := gl.Call("createShader", glTypes.FragmentShader)
+	fragShader := gl.Call("createShader", webgl.FRAGMENT_SHADER)
 	gl.Call("shaderSource", fragShader, fragShaderCode)
 	gl.Call("compileShader", fragShader)
 
@@ -129,14 +124,14 @@ func main() {
 	ViewMatrix := gl.Call("getUniformLocation", shaderProgram, "Vmatrix")
 	ModelMatrix = gl.Call("getUniformLocation", shaderProgram, "Mmatrix")
 
-	gl.Call("bindBuffer", glTypes.ArrayBuffer, vertexBuffer)
+	gl.Call("bindBuffer", webgl.ARRAY_BUFFER, vertexBuffer)
 	position := gl.Call("getAttribLocation", shaderProgram, "position")
-	gl.Call("vertexAttribPointer", position, 3, glTypes.Float, false, 0, 0)
+	gl.Call("vertexAttribPointer", position, 3, webgl.FLOAT, false, 0, 0)
 	gl.Call("enableVertexAttribArray", position)
 
-	gl.Call("bindBuffer", glTypes.ArrayBuffer, colorBuffer)
+	gl.Call("bindBuffer", webgl.ARRAY_BUFFER, colorBuffer)
 	color := gl.Call("getAttribLocation", shaderProgram, "color")
-	gl.Call("vertexAttribPointer", color, 3, glTypes.Float, false, 0, 0)
+	gl.Call("vertexAttribPointer", color, 3, webgl.FLOAT, false, 0, 0)
 	gl.Call("enableVertexAttribArray", color)
 
 	gl.Call("useProgram", shaderProgram)
@@ -145,7 +140,7 @@ func main() {
 	gl.Call("clearColor", 0.5, 0.5, 0.5, 0.9) // Color the screen is cleared to
 	gl.Call("clearDepth", 1.0)                // Z value that is set to the Depth buffer every frame
 	gl.Call("viewport", 0, 0, width, height)  // Viewport size
-	gl.Call("depthFunc", glTypes.LEqual)
+	gl.Call("depthFunc", webgl.LEQUAL)
 
 	// * Create Matrixes *
 	ratio := float32(width) / float32(height)
@@ -154,21 +149,21 @@ func main() {
 	projMatrix := mgl32.Perspective(mgl32.DegToRad(45.0), ratio, 1, 100.0)
 	var projMatrixBuffer *[16]float32
 	projMatrixBuffer = (*[16]float32)(unsafe.Pointer(&projMatrix))
-	typedProjMatrixBuffer := js.TypedArrayOf([]float32((*projMatrixBuffer)[:]))
+	typedProjMatrixBuffer := webgl.SliceToTypedArray([]float32((*projMatrixBuffer)[:]))
 	gl.Call("uniformMatrix4fv", PositionMatrix, false, typedProjMatrixBuffer)
 
 	// Generate and apply view matrix
 	viewMatrix := mgl32.LookAtV(mgl32.Vec3{3.0, 3.0, 3.0}, mgl32.Vec3{0.0, 0.0, 0.0}, mgl32.Vec3{0.0, 1.0, 0.0})
 	var viewMatrixBuffer *[16]float32
 	viewMatrixBuffer = (*[16]float32)(unsafe.Pointer(&viewMatrix))
-	typedViewMatrixBuffer := js.TypedArrayOf([]float32((*viewMatrixBuffer)[:]))
+	typedViewMatrixBuffer := webgl.SliceToTypedArray([]float32((*viewMatrixBuffer)[:]))
 	gl.Call("uniformMatrix4fv", ViewMatrix, false, typedViewMatrixBuffer)
 
 	// * Drawing the Cube *
 	movMatrix = mgl32.Ident4()
 
 	// Bind to element array for draw function
-	gl.Call("bindBuffer", glTypes.ElementArrayBuffer, indexBuffer)
+	gl.Call("bindBuffer", webgl.ELEMENT_ARRAY_BUFFER, indexBuffer)
 
 	// Start the frame renderer
 	js.Global().Call("requestAnimationFrame", js.Global().Get("renderFrame"))
@@ -190,18 +185,18 @@ func renderFrame(now float64) {
 	// Convert model matrix to a JS TypedArray
 	var modelMatrixBuffer *[16]float32
 	modelMatrixBuffer = (*[16]float32)(unsafe.Pointer(&movMatrix))
-	typedModelMatrixBuffer := js.TypedArrayOf([]float32((*modelMatrixBuffer)[:]))
+	typedModelMatrixBuffer := webgl.SliceToTypedArray([]float32((*modelMatrixBuffer)[:]))
 
 	// Apply the model matrix
 	gl.Call("uniformMatrix4fv", ModelMatrix, false, typedModelMatrixBuffer)
 
 	// Clear the screen
-	gl.Call("enable", glTypes.DepthTest)
-	gl.Call("clear", glTypes.ColorBufferBit)
-	gl.Call("clear", glTypes.DepthBufferBit)
+	gl.Call("enable", webgl.DEPTH_TEST)
+	gl.Call("clear", webgl.COLOR_BUFFER_BIT)
+	gl.Call("clear", webgl.DEPTH_BUFFER_BIT)
 
 	// Draw the cube
-	gl.Call("drawElements", glTypes.Triangles, len(indicesNative), glTypes.UnsignedShort, 0)
+	gl.Call("drawElements", webgl.TRIANGLES, len(indicesNative), webgl.UNSIGNED_SHORT, 0)
 
 	// Keep the frame rendering going
 	js.Global().Call("requestAnimationFrame", js.Global().Get("renderFrame"))
